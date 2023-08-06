@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ToDo List</title>
+</head>
+<body>
+  <h1>ToDo List</h1>
+  <form id="my-form">
+    <label for="todo">ToDo:</label>
+    <input type="text" id="todo" required>
+    <br><br>
+    <label for="description">Description:</label>
+    <input type="text" id="description" required>
+    <br>
+    <button type="submit">Add Item</button>
+  </form>
+  <p class="msg"></p>
+  <h2>ToDo Remaining:</h2>
+  <ul id="todoRemainingList" class="list-group"></ul>
+  <h2>ToDo Done:</h2>
+  <ul id="todoDoneList" class="list-group"></ul>
+
+  <div id="loadingSpinner" style="display: none;">
+    Loading...
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script>
+    let todoRemaining = [];
+    let todoDone = [];
+
+    function saveToLocalStorage() {
+      localStorage.setItem('todoRemaining', JSON.stringify(todoRemaining));
+      localStorage.setItem('todoDone', JSON.stringify(todoDone));
+    }
+
+    function fetchAndDisplayTodos() {
+      document.getElementById('loadingSpinner').style.display = 'block'; 
+
+      axios.get('https://crudcrud.com/api/a704943b64474ca9b9838a9b7e550c38/todo')
+        .then((response) => {
+          todoRemaining = response.data.filter(todo => !todo.done);
+          todoDone = response.data.filter(todo => todo.done);
+          updateUI();
+          saveToLocalStorage();
+        })
+        .catch((error) => {
+          console.log(error);
+        })
+        .finally(() => {
+          document.getElementById('loadingSpinner').style.display = 'none'; 
+        });
+    }
+
+    function toggleDone(todoId, event) {
+      event.stopPropagation(); 
+      const todoItem = todoRemaining.find(item => item._id === todoId);
+      if (todoItem) {
+        todoItem.done = !todoItem.done;
+        todoRemaining = todoRemaining.filter(item => item._id !== todoId);
+        if (todoItem.done) {
+          todoDone.push(todoItem);
+        } else {
+          todoRemaining.push(todoItem);
+        }
+        updateUI();
+        saveToLocalStorage();
+      }
+    }
+
+    function deleteItem(todoId) {
+      axios.delete(`https://crudcrud.com/api/a704943b64474ca9b9838a9b7e550c38/todo/${todoId}`)
+        .then((response) => {
+          console.log(response);
+          fetchAndDisplayTodos();
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+    }
+
+    function updateUI() {
+      const todoRemainingList = document.getElementById('todoRemainingList');
+      todoRemainingList.innerHTML = '';
+      todoRemaining.forEach(todo => {
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item d-flex align-items-center';
+        listItem.innerHTML = `
+          ${todo.todo} - ${todo.description}
+          <span class="ml-auto">${todo.done ? '✔' : `<button class="btn btn-success btn-sm mr-2" onclick="toggleDone(\`${todo._id}\`, event)">✔</button>`}</span>
+          <span class="ml-2"><button class="btn btn-danger btn-sm" onclick="deleteItem(\`${todo._id}\`)">✗</button></span>
+        `;
+        todoRemainingList.appendChild(listItem);
+
+        
+        const rightTickButton = listItem.querySelector('.btn-success');
+        if (rightTickButton) {
+          rightTickButton.addEventListener('click', (event) => {
+            event.stopPropagation(); 
+            toggleDone(todo._id, event);
+          });
+        }
+      });
+
+      const todoDoneList = document.getElementById('todoDoneList');
+      todoDoneList.innerHTML = '';
+      todoDone.forEach(todo => {
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item d-flex align-items-center';
+        listItem.innerHTML = `
+          <span class="mr-2 text-success">&#10004;</span>
+          ${todo.todo} - ${todo.description}
+        `;
+        todoDoneList.appendChild(listItem);
+      });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      const todoInput = document.getElementById('todo');
+      const descriptionInput = document.getElementById('description');
+
+      if (localStorage.getItem('todoRemaining') && localStorage.getItem('todoDone')) {
+        todoRemaining = JSON.parse(localStorage.getItem('todoRemaining'));
+        todoDone = JSON.parse(localStorage.getItem('todoDone'));
+        updateUI();
+      } else {
+        fetchAndDisplayTodos();
+      }
+
+      document.getElementById('my-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const todo = todoInput.value;
+        const description = descriptionInput.value;
+
+        if (todo === '' || description === '') {
+          const msg = document.querySelector('.msg');
+          msg.classList.add('error');
+          msg.innerHTML = 'Please enter all fields';
+
+          setTimeout(() => {
+            msg.classList.remove('error');
+            msg.innerHTML = '';
+          }, 3000);
+        } else {
+          const todoItem = {
+            todo: todo,
+            description: description,
+            done: false
+          };
+
+          axios.post('https://crudcrud.com/api/a704943b64474ca9b9838a9b7e550c38/todo', todoItem)
+            .then((response) => {
+              console.log(response);
+              fetchAndDisplayTodos();
+            })
+            .catch((err) => {
+              console.log(err);
+            });
+
+          todoInput.value = '';
+          descriptionInput.value = '';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
